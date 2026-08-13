@@ -120,7 +120,8 @@ export default function AASCommandDashboard() {
 
     switch (cmd) {
       case 'launch':
-        fetch('http://localhost:8080/v1/swarm/launch', { method: 'POST' }).catch(console.error);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        fetch(`${API_URL}/v1/swarm/launch`, { method: 'POST' }).catch(console.error);
         showToast(
           'SWARM TAKEOFF SEQUENCE',
           'MAVLink TAKEOFF command broadcast successful.',
@@ -129,7 +130,8 @@ export default function AASCommandDashboard() {
         addManualLog('MAVLink Command Broadcast: TAKEOFF sequence initiated for all active swarm nodes.', false, 'SYSTEM');
         break;
       case 'pause':
-        fetch('http://localhost:8080/v1/swarm/pause', { method: 'POST' }).catch(console.error);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        fetch(`${API_URL}/v1/swarm/pause`, { method: 'POST' }).catch(console.error);
         showToast(
           'SWARM MOTION HOLD',
           'Swarm loitering in current coordinates.',
@@ -138,7 +140,8 @@ export default function AASCommandDashboard() {
         addManualLog('MAVLink Command Broadcast: Swarm HOLD (loiter) command issued.', false, 'SYSTEM');
         break;
       case 'rtl':
-        fetch('http://localhost:8080/v1/swarm/rtl', { method: 'POST' }).catch(console.error);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        fetch(`${API_URL}/v1/swarm/rtl`, { method: 'POST' }).catch(console.error);
         showToast(
           'EMERGENCY RTL BROADCAST',
           'All drones returning to base coordinates.',

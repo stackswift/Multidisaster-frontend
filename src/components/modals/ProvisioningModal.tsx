@@ -73,7 +73,8 @@ export function ProvisioningModal({ isOpen, onClose, onSuccess }: ProvisioningMo
     setPairingCode(code);
 
     // POST /v1/swarm/claim with credentials from the persistent settings store
-    fetch("http://localhost:8080/v1/swarm/claim", {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    fetch(`${API_URL}/v1/swarm/claim`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
