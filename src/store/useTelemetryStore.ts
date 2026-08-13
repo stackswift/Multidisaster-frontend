@@ -58,7 +58,15 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
       const newLogs: TerminalLog[] = [];
 
       rawBatch.forEach((item, index) => {
+        // preserve the LLM data channel bboxes so they aren't wiped out by high-frequency telemetry
+        const existingBboxes = nextDrones[item.drone_id]?.ai_status?.bboxes;
+        
         nextDrones[item.drone_id] = item;
+        
+        if (existingBboxes && nextDrones[item.drone_id].ai_status) {
+          nextDrones[item.drone_id].ai_status.bboxes = existingBboxes;
+        }
+
         nextGeoJson[item.drone_id] = geoJsonBatch[index];
 
         const isAnomaly = item.ai_status?.anomaly_detected ?? false;
@@ -92,11 +100,12 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
 
   processLLMDataChannel: (payload) => 
     set((state) => {
-      const aiStatus = payload.ai_status as { anomaly_detected?: boolean; anomaly_type?: string; confidence?: number } | undefined;
+      const aiStatus = payload.ai_status as { anomaly_detected?: boolean; anomaly_type?: string; confidence?: number; yolo_detections?: string; bboxes?: Array<{label: string; conf: number; x1: number; y1: number; x2: number; y2: number}> } | undefined;
       const droneId = (payload.drone_id as string) || 'AI_AGENT';
       const isAnomaly = aiStatus?.anomaly_detected ?? false;
       const type = aiStatus?.anomaly_type || 'unknown';
       const conf = aiStatus?.confidence || 0.0;
+      const yolo = aiStatus?.yolo_detections || '';
       
       const timeStr = new Date().toISOString().substring(11, 19);
       const newLog: TerminalLog = {
@@ -104,8 +113,10 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
         timestamp: timeStr,
         droneId: droneId,
         message: isAnomaly 
-          ? `[Phi Commander] Critical Alert: ${type.toUpperCase()} DETECTED. Confidence: ${(conf * 100).toFixed(0)}%`
-          : `[Phi Commander] Scan Nominal.`,
+          ? `[Phi Commander] 🔥 FIRE DETECTED: ${type.toUpperCase()}. Confidence: ${(conf * 100).toFixed(0)}%. YOLO: ${yolo || 'scanning...'}`
+          : yolo
+            ? `[Phi Commander] Scan: ${yolo}`
+            : `[Phi Commander] Scan Nominal.`,
         isAnomaly: isAnomaly,
       };
 
@@ -114,7 +125,7 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
       if (nextDrones[droneId]) {
         nextDrones[droneId] = {
           ...nextDrones[droneId],
-          ai_status: aiStatus as { anomaly_detected: boolean; anomaly_type: string; confidence: number },
+          ai_status: aiStatus as { anomaly_detected: boolean; anomaly_type: string; confidence: number; bboxes?: Array<{label: string; conf: number; x1: number; y1: number; x2: number; y2: number}> },
         };
       } else {
         // Create a placeholder drone entry for LLM-only events
@@ -123,7 +134,7 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
           timestamp: Date.now() / 1000,
           gps: { lat: 0, lon: 0, alt_rel_m: 0 },
           battery: 0,
-          ai_status: aiStatus as { anomaly_detected: boolean; anomaly_type: string; confidence: number },
+          ai_status: aiStatus as { anomaly_detected: boolean; anomaly_type: string; confidence: number; bboxes?: Array<{label: string; conf: number; x1: number; y1: number; x2: number; y2: number}> },
         };
       }
 

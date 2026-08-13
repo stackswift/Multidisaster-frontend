@@ -139,17 +139,68 @@ const MockVideoTracksGrid = () => {
   );
 };
 
-const MemoizedParticipantTile = memo(({ trackRef, hasAnomaly }: { trackRef: TrackReferenceOrPlaceholder; hasAnomaly: boolean }) => {
+interface BBox {
+  label: string;
+  conf: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+const MemoizedParticipantTile = memo(({ trackRef, hasAnomaly, bboxes }: { trackRef: TrackReferenceOrPlaceholder; hasAnomaly: boolean; bboxes?: BBox[] }) => {
   return (
     <div
-      className={`relative rounded-xl overflow-hidden border transition-all duration-300 ${
+      className={`relative rounded-xl overflow-hidden border transition-all duration-300 flex items-center justify-center bg-black ${
         hasAnomaly
           ? 'border-orange-500 shadow-[0_0_20px_rgba(255,85,0,0.4)] animate-pulse'
           : 'border-teal-500/20 hover:border-teal-500/40'
       }`}
       style={{ contain: 'strict' }}
     >
-      <ParticipantTile trackRef={trackRef} />
+      <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 [&>div]:h-full [&>div]:w-full [&>div>video]:object-cover">
+          <ParticipantTile trackRef={trackRef} />
+        </div>
+
+        {/* Custom Placeholder Overlay for VOD Loading State */}
+        {(!trackRef.publication) && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md border border-teal-500/20">
+            <div className="w-10 h-10 border-4 border-teal-500/30 border-t-teal-400 rounded-full animate-spin mb-3"></div>
+            <span className="text-teal-400 font-mono font-bold tracking-widest text-[10px] animate-pulse">PROCESSING VIDEO UPLOAD...</span>
+            <span className="text-teal-500/50 font-mono text-[8px] mt-1">ENCODING & RE-ESTABLISHING FEED</span>
+          </div>
+        )}
+        
+        {/* YOLO Bounding Boxes Overlay */}
+        {bboxes && bboxes.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none z-20">
+          {bboxes.map((box, i) => (
+            <div
+              key={i}
+              className={`absolute border-2 transition-all duration-75 ${
+                box.label.toLowerCase() === 'fire' 
+                  ? 'border-orange-500 bg-orange-500/10 shadow-[0_0_10px_rgba(255,85,0,0.3)]' 
+                  : 'border-blue-500 bg-blue-500/10 shadow-[0_0_10px_rgba(0,122,255,0.3)]'
+              }`}
+              style={{
+                left: `${box.x1 * 100}%`,
+                top: `${box.y1 * 100}%`,
+                width: `${(box.x2 - box.x1) * 100}%`,
+                height: `${(box.y2 - box.y1) * 100}%`
+              }}
+            >
+              <span className={`absolute -top-4 left-[-2px] text-white font-mono font-bold text-[9px] px-1 whitespace-nowrap z-30 ${
+                box.label.toLowerCase() === 'fire' ? 'bg-orange-500' : 'bg-blue-500'
+              }`}>
+                {box.label.toUpperCase()} {(box.conf * 100).toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      </div>
+
       <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-2 py-1 rounded border border-slate-800 text-[10px] font-mono">
         <span className={`w-2 h-2 rounded-full ${hasAnomaly ? 'bg-orange-500 animate-ping' : 'bg-teal-400'}`} />
         <span className="text-slate-200 font-semibold">
@@ -172,7 +223,7 @@ const VideoTracksGrid = () => {
   }, [participants]);
   
   useDataChannel(
-    '*',
+    'telemetry',
     (msg) => {
       try {
         const payloadStr = new TextDecoder().decode(msg.payload as ArrayBuffer);
@@ -188,7 +239,7 @@ const VideoTracksGrid = () => {
 
   const tracks = useTracks(
     [
-      { source: Track.Source.Camera, withPlaceholder: false },
+      { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.Unknown, withPlaceholder: false },
       { source: Track.Source.ScreenShare, withPlaceholder: false }
     ],
@@ -200,6 +251,7 @@ const VideoTracksGrid = () => {
   }, [tracks]);
 
   const activeAnomalies = useTelemetryStore((state) => state.activeAnomalies);
+  const drones = useTelemetryStore((state) => state.drones);
   const anomalyIds = new Set(activeAnomalies.map((a) => a.drone_id));
 
   // Fallback to emulated mock drone feeds if no real remote camera feeds are publishing
@@ -207,17 +259,44 @@ const VideoTracksGrid = () => {
     return <MockVideoTracksGrid />;
   }
 
+  // DE-DUPLICATE TRACKS: Ensure only ONE tile is rendered per drone!
+  // If the edge daemon has ghost tracks, placeholders, or concurrent publishes, we group by identity
+  // and prioritize active publications over placeholders.
+  const uniqueTracksMap = new Map<string, TrackReferenceOrPlaceholder>();
+  
+  tracks.forEach(trackRef => {
+    const id = trackRef.participant.identity;
+    
+    // Ignore ghost LiveKit participants from previous tests!
+    if (!drones[id]) return;
+
+    if (!uniqueTracksMap.has(id)) {
+      uniqueTracksMap.set(id, trackRef);
+    } else {
+      const existing = uniqueTracksMap.get(id)!;
+      // If we currently have a placeholder, but we found an actual video track, swap it!
+      if (!existing.publication && trackRef.publication) {
+        uniqueTracksMap.set(id, trackRef);
+      }
+    }
+  });
+
+  const uniqueTracks = Array.from(uniqueTracksMap.values());
+
   return (
     <div className="grid grid-cols-1 gap-3 h-full w-full overflow-y-auto custom-scrollbar">
-      {tracks.map((trackRef, index) => {
+      {uniqueTracks.map((trackRef, index) => {
         const droneId = trackRef.participant.identity;
         const hasAnomaly = anomalyIds.has(droneId);
+        const drone = drones[droneId];
+        const bboxes = drone?.ai_status?.bboxes;
 
         return (
           <MemoizedParticipantTile
-            key={`${trackRef.participant.sid || trackRef.participant.identity || ''}_${trackRef.source}_${index}`}
+            key={`${droneId}_${index}`}
             trackRef={trackRef}
             hasAnomaly={hasAnomaly}
+            bboxes={bboxes}
           />
         );
       })}

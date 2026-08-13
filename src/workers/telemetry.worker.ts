@@ -11,6 +11,14 @@ export interface RawTelemetryPayload {
     anomaly_type: string;
     confidence: number;
     sit_rep?: string;
+    bboxes?: {
+      label: string;
+      conf: number;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }[];
   };
   battery?: number;
 }
