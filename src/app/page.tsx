@@ -9,6 +9,7 @@ import { AiTerminal } from '@/components/terminal/AiTerminal';
 import { ProvisioningModal } from '@/components/modals/ProvisioningModal';
 import { GlobalSettingsModal } from '@/components/modals/GlobalSettingsModal';
 import { VodInterface } from '@/components/video/VodInterface';
+import { TokenSpeedMonitor } from '@/components/terminal/TokenSpeedMonitor';
 import { useTelemetryStore } from '@/store/useTelemetryStore';
 import { useProvisionStore } from '@/store/useProvisionStore';
 import { useVodStore } from '@/store/useVodStore';
@@ -128,6 +129,7 @@ export default function AASCommandDashboard() {
         addManualLog('MAVLink Command Broadcast: TAKEOFF sequence initiated for all active swarm nodes.', false, 'SYSTEM');
         break;
       case 'pause':
+        fetch('http://localhost:8080/v1/swarm/pause', { method: 'POST' }).catch(console.error);
         showToast(
           'SWARM MOTION HOLD',
           'Swarm loitering in current coordinates.',
@@ -136,6 +138,7 @@ export default function AASCommandDashboard() {
         addManualLog('MAVLink Command Broadcast: Swarm HOLD (loiter) command issued.', false, 'SYSTEM');
         break;
       case 'rtl':
+        fetch('http://localhost:8080/v1/swarm/rtl', { method: 'POST' }).catch(console.error);
         showToast(
           'EMERGENCY RTL BROADCAST',
           'All drones returning to base coordinates.',
@@ -315,7 +318,8 @@ export default function AASCommandDashboard() {
               </div>
             )}
           </div>
-          <div className="h-64 min-h-0">
+          <div className="h-64 min-h-0 flex flex-col gap-3">
+            <TokenSpeedMonitor />
             <AiTerminal />
           </div>
         </aside>

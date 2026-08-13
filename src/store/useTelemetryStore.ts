@@ -15,12 +15,15 @@ interface TelemetryStore {
   activeAnomalies: RawTelemetryPayload[];
   terminalLogs: TerminalLog[];
   connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+  tokenSpeed: number | null;
+  latencySec: number | null;
   
   processBatch: (rawBatch: RawTelemetryPayload[], geoJsonBatch: GeoJSONFeature[]) => void;
   setConnectionStatus: (status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR') => void;
   clearLogs: () => void;
   addManualLog: (message: string, isAnomaly?: boolean, droneId?: string) => void;
   processLLMDataChannel: (payload: Record<string, unknown>) => void;
+  setLlmMetrics: (tps: number | null, latency: number | null) => void;
 }
 
 let logIdCounter = 0;
@@ -31,8 +34,11 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
   activeAnomalies: [],
   terminalLogs: [],
   connectionStatus: 'DISCONNECTED',
+  tokenSpeed: null,
+  latencySec: null,
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
+  setLlmMetrics: (tps, latency) => set({ tokenSpeed: tps, latencySec: latency }),
 
   clearLogs: () => set({ terminalLogs: [] }),
 
@@ -106,6 +112,8 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
       const type = aiStatus?.anomaly_type || 'unknown';
       const conf = aiStatus?.confidence || 0.0;
       const yolo = aiStatus?.yolo_detections || '';
+      const tps = (aiStatus as any)?.tokens_per_sec || (payload as any)?.tokens_per_sec || null;
+      const latency = (aiStatus as any)?.latency_sec || (payload as any)?.latency_sec || null;
       
       const timeStr = new Date().toISOString().substring(11, 19);
       const newLog: TerminalLog = {
@@ -146,6 +154,8 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
         drones: nextDrones,
         activeAnomalies: updatedAnomalies,
         terminalLogs: [newLog, ...state.terminalLogs].slice(0, 200),
+        ...(tps !== null && { tokenSpeed: tps }),
+        ...(latency !== null && { latencySec: latency })
       };
     }),
 }));

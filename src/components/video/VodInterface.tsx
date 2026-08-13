@@ -59,17 +59,31 @@ export const VodInterface = () => {
           setVideoUrl(res.video_url);
           if (res.logs && res.logs.length > 0) {
             // Convert api logs to TerminalLog format
-            const mappedLogs = res.logs.map((l: { type: string; message: string; mavlink?: Record<string, unknown> }, i: number) => ({
-              id: `vod-res-${Date.now()}-${i}`,
-              timestamp: new Date().toISOString().substring(11, 19),
-              droneId: 'VOD-ANALYSIS',
-              message: l.type === 'anomaly' 
-                ? `YOLO TRIGGER: ${l.message}` 
-                : l.mavlink 
-                  ? `[Commander] MAVLink Command Generated: \n${JSON.stringify(l.mavlink, null, 2)}`
-                  : l.message,
-              isAnomaly: l.type === 'anomaly'
-            }));
+            const mappedLogs = res.logs.map((l: { type: string; message: string; mavlink?: Record<string, unknown>; tokens_per_sec?: number; latency_sec?: number }, i: number) => {
+              // Extract LLM metrics if this is a speed log
+              if (l.type === 'llm_speed' && l.tokens_per_sec) {
+                useVodStore.getState().setLlmMetrics(l.tokens_per_sec, l.latency_sec ?? 0);
+                return {
+                  id: `vod-res-${Date.now()}-${i}`,
+                  timestamp: new Date().toISOString().substring(11, 19),
+                  droneId: 'VOD-ANALYSIS',
+                  message: `[System] Inference Complete: ${l.tokens_per_sec.toFixed(2)} TPS (Latency: ${l.latency_sec?.toFixed(2)}s)`,
+                  isAnomaly: false
+                };
+              }
+              
+              return {
+                id: `vod-res-${Date.now()}-${i}`,
+                timestamp: new Date().toISOString().substring(11, 19),
+                droneId: 'VOD-ANALYSIS',
+                message: l.type === 'anomaly' 
+                  ? `YOLO TRIGGER: ${l.message}` 
+                  : l.mavlink 
+                    ? `[Commander] MAVLink Command Generated: \n${JSON.stringify(l.mavlink, null, 2)}`
+                    : (l.message || 'Unknown log type'),
+                isAnomaly: l.type === 'anomaly'
+              };
+            });
             setVodLogs(mappedLogs);
           }
           setProcessingState('complete');
