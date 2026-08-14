@@ -41,7 +41,8 @@ export const VodInterface = () => {
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://127.0.0.1:8000/api/analyze', true);
+      const vodApiUrl = process.env.NEXT_PUBLIC_VOD_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      xhr.open('POST', `${vodApiUrl}/api/analyze`, true);
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

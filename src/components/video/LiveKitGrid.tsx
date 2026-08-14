@@ -226,7 +226,7 @@ const VideoTracksGrid = () => {
     'telemetry',
     (msg) => {
       try {
-        const payloadStr = new TextDecoder().decode(msg.payload as ArrayBuffer);
+        const payloadStr = new TextDecoder().decode(msg.payload);
         const payload = JSON.parse(payloadStr) as { ai_status?: unknown };
         if (payload.ai_status) {
           processLLMDataChannel(payload as Record<string, unknown>);

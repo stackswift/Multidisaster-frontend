@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useTelemetryStore } from '@/store/useTelemetryStore';
-import { WorkerOutgoingMessage, WorkerIncomingMessage } from '@/workers/telemetry.worker';
+import { WorkerOutgoingMessage, WorkerIncomingMessage, RawTelemetryPayload, GeoJSONFeature } from '@/workers/telemetry.worker';
 
 export const useTelemetryWorker = (wssUrl: string) => {
   const workerRef = useRef<Worker | null>(null);
