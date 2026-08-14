@@ -107,7 +107,16 @@ export const useTelemetryStore = create<TelemetryStore>((set) => ({
   processLLMDataChannel: (payload) => 
     set((state) => {
       const aiStatus = payload.ai_status as { anomaly_detected?: boolean; anomaly_type?: string; confidence?: number; yolo_detections?: string; bboxes?: Array<{label: string; conf: number; x1: number; y1: number; x2: number; y2: number}> } | undefined;
-      const droneId = (payload.drone_id as string) || 'AI_AGENT';
+      let droneId = (payload.drone_id as string) || 'AI_AGENT';
+      
+      // Case-insensitive lookup to handle the drone_ vs Drone_ bug
+      const matchedId = Object.keys(state.drones).find(
+        key => key.toLowerCase() === droneId.toLowerCase()
+      );
+      if (matchedId) {
+        droneId = matchedId;
+      }
+
       const isAnomaly = aiStatus?.anomaly_detected ?? false;
       const type = aiStatus?.anomaly_type || 'unknown';
       const conf = aiStatus?.confidence || 0.0;

@@ -267,8 +267,13 @@ const VideoTracksGrid = () => {
   tracks.forEach(trackRef => {
     const id = trackRef.participant.identity;
     
+    // Find a matching drone regardless of case differences
+    const matchedDroneId = Object.keys(drones).find(
+      key => key.toLowerCase() === id.toLowerCase()
+    );
+
     // Ignore ghost LiveKit participants from previous tests!
-    if (!drones[id]) return;
+    if (!matchedDroneId) return;
 
     if (!uniqueTracksMap.has(id)) {
       uniqueTracksMap.set(id, trackRef);
